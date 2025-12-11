@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNA Sequence Analysis Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a4d68 0%, #05668d 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #028090 0%, #05668d 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.4em;
+            color: #028090;
+            margin-bottom: 15px;
+            font-weight: 600;
+            border-left: 4px solid #028090;
+            padding-left: 15px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 180px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #028090;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        button {
+            padding: 12px 28px;
+            background: linear-gradient(135deg, #028090 0%, #05668d 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(2, 128, 144, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(2, 128, 144, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #028090;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            color: #028090;
+            font-weight: 700;
+        }
+
+        .output-box {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            min-height: 100px;
+            max-height: 300px;
+            overflow-y: auto;
+            word-wrap: break-word;
+            line-height: 1.6;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+
+        .instruction-box {
+            background: #e7f3f5;
+            border-left: 4px solid #028090;
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 0.95em;
+            color: #333;
+        }
+
+        .sequence-display {
+            color: #028090;
+            font-weight: 500;
+        }
+
+        footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            border-top: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>DNA Sequence Analysis Tool</h1>
+            <p>Advanced Bioinformatics Analysis Platform</p>
+        </header>
+
+        <div class="content">
+            <div id="alertBox" class="alert"></div>
+
+            <div class="section">
+                <h2 class="section-title">Sequence Input</h2>
+                <div class="instruction-box">
+                    Enter your DNA sequence below (A, T, G, C). The tool will automatically remove numbers and whitespace. Sequences can be entered in uppercase or lowercase.
+                </div>
+                <textarea
+                    id="dnaInput"
+                    placeholder="Paste your DNA sequence here... (e.g., ATGCGATCGATCG)"
+                    spellcheck="false"
+                ></textarea>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">Analysis Tools</h2>
+                <div class="button-group">
+                    <button onclick="calculateGCContent()">Calculate GC Content</button>
+                    <button onclick="generateReverseComplement()">Reverse Complement</button>
+                    <button onclick="translateToProtein()">Translate to Protein</button>
+                    <button onclick="clearAll()" style="background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);">Clear All</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Sequence Length</div>
+                        <div class="stat-value" id="lengthStat">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">GC Content</div>
+                        <div class="stat-value" id="gcStat">0%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">A Count</div>
+                        <div class="stat-value" id="aStat">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">T Count</div>
+                        <div class="stat-value" id="tStat">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">G Count</div>
+                        <div class="stat-value" id="gStat">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">C Count</div>
+                        <div class="stat-value" id="cStat">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">Output</h2>
+                <div class="output-box" id="outputBox">
+                    Results will appear here...
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            DNA Sequence Analysis Tool | For Research and Educational Purposes
+        </footer>
+    </div>
+
+    <script>
+        /**
+         * GENETIC CODE TABLE
+         * Maps DNA codons (triplets) to their corresponding amino acids
+         * Standard genetic code used for translation
+         */
+        const geneticCode = {
+            'TTT': 'F', 'TTC': 'F', 'TTA': 'L', 'TTG': 'L',
+            'TCT': 'S', 'TCC': 'S', 'TCA': 'S', 'TCG': 'S',
+            'TAT': 'Y', 'TAC': 'Y', 'TAA': '*', 'TAG': '*',
+            'TGT': 'C', 'TGC': 'C', 'TGA': '*', 'TGG': 'W',
+            'CTT': 'L', 'CTC': 'L', 'CTA': 'L', 'CTG': 'L',
+            'CCT': 'P', 'CCC': 'P', 'CCA': 'P', 'CCG': 'P',
+            'CAT': 'H', 'CAC': 'H', 'CAA': 'Q', 'CAG': 'Q',
+            'CGT': 'R', 'CGC': 'R', 'CGA': 'R', 'CGG': 'R',
+            'ATT': 'I', 'ATC': 'I', 'ATA': 'I', 'ATG': 'M',
+            'ACT': 'T', 'ACC': 'T', 'ACA': 'T', 'ACG': 'T',
+            'AAT': 'N', 'AAC': 'N', 'AAA': 'K', 'AAG': 'K',
+            'AGT': 'S', 'AGC': 'S', 'AGA': 'R', 'AGG': 'R',
+            'GTT': 'V', 'GTC': 'V', 'GTA': 'V', 'GTG': 'V',
+            'GCT': 'A', 'GCC': 'A', 'GCA': 'A', 'GCG': 'A',
+            'GAT': 'D', 'GAC': 'D', 'GAA': 'E', 'GAG': 'E',
+            'GGT': 'G', 'GGC': 'G', 'GGA': 'G', 'GGG': 'G'
+        };
+
+        /**
+         * Cleans and validates the DNA sequence input
+         * Removes whitespace and numbers, converts to uppercase
+         * Returns an object with the cleaned sequence and validation status
+         *
+         * @returns {Object} { sequence: string, isValid: boolean, invalidChars: string }
+         */
+        function cleanAndValidateSequence() {
+            // Get the raw input from the textarea
+            const rawInput = document.getElementById('dnaInput').value;
+
+            // Remove all whitespace (spaces, tabs, newlines) and numbers
+            let cleaned = rawInput.replace(/[\s0-9]/g, '').toUpperCase();
+
+            // Check for invalid characters (anything other than A, T, G, C)
+            const validDNA = /^[ATGC]*$/;
+            const isValid = validDNA.test(cleaned);
+
+            // Find any invalid characters for error reporting
+            const invalidChars = cleaned.replace(/[ATGC]/g, '');
+
+            return {
+                sequence: cleaned,
+                isValid: isValid,
+                invalidChars: invalidChars
+            };
+        }
+
+        /**
+         * Displays an alert message to the user
+         *
+         * @param {string} message - The message to display
+         * @param {string} type - Type of alert ('warning', 'error', 'success')
+         */
+        function showAlert(message, type = 'warning') {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.textContent = message;
+            alertBox.className = `alert alert-${type}`;
+            alertBox.style.display = 'block';
+
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    alertBox.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        /**
+         * Hides the alert message
+         */
+        function hideAlert() {
+            document.getElementById('alertBox').style.display = 'none';
+        }
+
+        /**
+         * Updates all the statistics displayed in the stats grid
+         *
+         * @param {string} sequence - The cleaned DNA sequence
+         */
+        function updateStats(sequence) {
+            // Count each nucleotide type
+            const counts = {
+                A: (sequence.match(/A/g) || []).length,
+                T: (sequence.match(/T/g) || []).length,
+                G: (sequence.match(/G/g) || []).length,
+                C: (sequence.match(/C/g) || []).length
+            };
+
+            // Calculate GC content (important metric in bioinformatics)
+            // GC content affects DNA stability and is used in various analyses
+            const gcContent = sequence.length > 0
+                ? (((counts.G + counts.C) / sequence.length) * 100).toFixed(2)
+                : 0;
+
+            // Update the DOM with calculated statistics
+            document.getElementById('lengthStat').textContent = sequence.length;
+            document.getElementById('gcStat').textContent = gcContent + '%';
+            document.getElementById('aStat').textContent = counts.A;
+            document.getElementById('tStat').textContent = counts.T;
+            document.getElementById('gStat').textContent = counts.G;
+            document.getElementById('cStat').textContent = counts.C;
+        }
+
+        /**
+         * Displays output in the output box
+         *
+         * @param {string} content - The content to display
+         */
+        function displayOutput(content) {
+            document.getElementById('outputBox').innerHTML = content;
+        }
+
+        /**
+         * FUNCTION: Calculate GC Content
+         *
+         * GC content is the percentage of nitrogenous bases in a DNA sequence
+         * that are either guanine (G) or cytosine (C). This is an important metric
+         * because GC base pairs have three hydrogen bonds (vs. two for AT pairs),
+         * affecting DNA stability, melting temperature, and other properties.
+         */
+        function calculateGCContent() {
+            hideAlert();
+
+            // Clean and validate the input sequence
+            const { sequence, isValid, invalidChars } = cleanAndValidateSequence();
+
+            // Check if sequence is empty
+            if (sequence.length === 0) {
+                showAlert('Please enter a DNA sequence first.', 'error');
+                return;
+            }
+
+            // Warn about invalid characters but continue with valid ones
+            if (!isValid) {
+                showAlert(`Warning: Invalid characters detected (${invalidChars}). They have been removed from analysis.`, 'warning');
+            }
+
+            // Update all statistics
+            updateStats(sequence);
+
+            // Calculate nucleotide counts
+            const gCount = (sequence.match(/G/g) || []).length;
+            const cCount = (sequence.match(/C/g) || []).length;
+            const totalLength = sequence.length;
+
+            // Calculate GC percentage
+            const gcPercentage = ((gCount + cCount) / totalLength * 100).toFixed(2);
+
+            // Display detailed results
+            const output = `
+                <strong>GC Content Analysis</strong><br><br>
+                Sequence Length: ${totalLength} bp<br>
+                Guanine (G) Count: ${gCount}<br>
+                Cytosine (C) Count: ${cCount}<br>
+                GC Count: ${gCount + cCount}<br><br>
+                <strong style="color: #028090; font-size: 1.2em;">GC Content: ${gcPercentage}%</strong><br><br>
+                <em>GC content affects DNA stability and melting temperature. Higher GC content typically indicates greater thermal stability.</em>
+            `;
+
+            displayOutput(output);
+            showAlert('GC content calculated successfully!', 'success');
+        }
+
+        /**
+         * FUNCTION: Generate Reverse Complement
+         *
+         * In molecular biology, the reverse complement is crucial for understanding
+         * double-stranded DNA. DNA strands are antiparallel, meaning one runs 5' to 3'
+         * and the complementary strand runs 3' to 5'. This function:
+         * 1. Reverses the sequence (5' to 3' becomes 3' to 5')
+         * 2. Complements each base (A↔T, G↔C)
+         */
+        function generateReverseComplement() {
+            hideAlert();
+
+            // Clean and validate the input sequence
+            const { sequence, isValid, invalidChars } = cleanAndValidateSequence();
+
+            // Check if sequence is empty
+            if (sequence.length === 0) {
+                showAlert('Please enter a DNA sequence first.', 'error');
+                return;
+            }
+
+            // Warn about invalid characters
+            if (!isValid) {
+                showAlert(`Warning: Invalid characters detected (${invalidChars}). They have been removed from analysis.`, 'warning');
+            }
+
+            // Update statistics
+            updateStats(sequence);
+
+            // Define complement mapping (base pairing rules)
+            const complement = {
+                'A': 'T',
+                'T': 'A',
+                'G': 'C',
+                'C': 'G'
+            };
+
+            // Step 1: Reverse the sequence
+            const reversed = sequence.split('').reverse().join('');
+
+            // Step 2: Complement each nucleotide
+            const reverseComplement = reversed
+                .split('')
+                .map(base => complement[base])
+                .join('');
+
+            // Format the sequence for better readability (groups of 10)
+            const formatSequence = (seq) => {
+                return seq.match(/.{1,10}/g).join(' ');
+            };
+
+            // Display the results
+            const output = `
+                <strong>Reverse Complement Generation</strong><br><br>
+                <strong>Original Sequence (5' → 3'):</strong><br>
+                <span class="sequence-display">${formatSequence(sequence)}</span><br><br>
+                <strong>Reverse Complement (5' → 3'):</strong><br>
+                <span class="sequence-display">${formatSequence(reverseComplement)}</span><br><br>
+                Length: ${reverseComplement.length} bp<br><br>
+                <em>The reverse complement represents the complementary DNA strand in the antiparallel orientation.</em>
+            `;
+
+            displayOutput(output);
+            showAlert('Reverse complement generated successfully!', 'success');
+        }
+
+        /**
+         * FUNCTION: Translate DNA to Protein
+         *
+         * Translation is the process of converting a DNA sequence into an amino acid
+         * sequence (protein). This follows the genetic code where:
+         * - Each 3 nucleotides (codon) codes for one amino acid
+         * - ATG is the start codon (codes for Methionine)
+         * - TAA, TAG, TGA are stop codons (terminate translation)
+         *
+         * This function searches for the first ATG (start codon) and translates
+         * until a stop codon is encountered.
+         */
+        function translateToProtein() {
+            hideAlert();
+
+            // Clean and validate the input sequence
+            const { sequence, isValid, invalidChars } = cleanAndValidateSequence();
+
+            // Check if sequence is empty
+            if (sequence.length === 0) {
+                showAlert('Please enter a DNA sequence first.', 'error');
+                return;
+            }
+
+            // Warn about invalid characters
+            if (!isValid) {
+                showAlert(`Warning: Invalid characters detected (${invalidChars}). They have been removed from analysis.`, 'warning');
+            }
+
+            // Update statistics
+            updateStats(sequence);
+
+            // Find the start codon (ATG)
+            const startIndex = sequence.indexOf('ATG');
+
+            if (startIndex === -1) {
+                showAlert('No start codon (ATG) found in the sequence. Cannot translate.', 'error');
+                displayOutput(`
+                    <strong>Translation Failed</strong><br><br>
+                    No start codon (ATG) was found in the sequence.<br><br>
+                    <em>Protein translation requires a start codon (ATG) to begin. Please ensure your sequence contains ATG.</em>
+                `);
+                return;
+            }
+
+            // Extract the coding sequence starting from ATG
+            const codingSequence = sequence.substring(startIndex);
+
+            // Translate the sequence
+            let protein = '';
+            let stopCodonFound = false;
+            let stopPosition = -1;
+
+            // Iterate through the sequence in steps of 3 (codons)
+            for (let i = 0; i < codingSequence.length; i += 3) {
+                // Extract the codon (3 nucleotides)
+                const codon = codingSequence.substring(i, i + 3);
+
+                // Skip incomplete codons at the end
+                if (codon.length < 3) {
+                    break;
+                }
+
+                // Look up the amino acid for this codon
+                const aminoAcid = geneticCode[codon];
+
+                // Check for stop codon (represented by *)
+                if (aminoAcid === '*') {
+                    stopCodonFound = true;
+                    stopPosition = startIndex + i;
+                    break;
+                }
+
+                // Add the amino acid to the protein sequence
+                protein += aminoAcid;
+            }
+
+            // Prepare detailed output
+            const codingLength = stopCodonFound
+                ? (stopPosition - startIndex)
+                : (Math.floor(codingSequence.length / 3) * 3);
+
+            const output = `
+                <strong>DNA to Protein Translation</strong><br><br>
+                <strong>Start Codon Position:</strong> ${startIndex + 1} bp<br>
+                ${stopCodonFound ? `<strong>Stop Codon Position:</strong> ${stopPosition + 1} bp<br>` : ''}
+                <strong>Coding Sequence Length:</strong> ${codingLength} bp<br>
+                <strong>Protein Length:</strong> ${protein.length} amino acids<br><br>
+                <strong>Amino Acid Sequence:</strong><br>
+                <span class="sequence-display" style="font-size: 1.1em; letter-spacing: 1px;">
+                    ${protein.match(/.{1,50}/g).join('<br>')}
+                </span><br><br>
+                ${!stopCodonFound ? '<em style="color: #856404;">Note: No stop codon found. Translation continued to the end of the sequence.</em><br>' : ''}
+                <em>Each letter represents one amino acid in the protein chain. The genetic code was used to translate codons (triplets) into amino acids.</em>
+            `;
+
+            displayOutput(output);
+            showAlert('Translation completed successfully!', 'success');
+        }
+
+        /**
+         * FUNCTION: Clear All
+         *
+         * Resets the entire interface to its initial state
+         */
+        function clearAll() {
+            // Clear the input textarea
+            document.getElementById('dnaInput').value = '';
+
+            // Reset all statistics to zero
+            document.getElementById('lengthStat').textContent = '0';
+            document.getElementById('gcStat').textContent = '0%';
+            document.getElementById('aStat').textContent = '0';
+            document.getElementById('tStat').textContent = '0';
+            document.getElementById('gStat').textContent = '0';
+            document.getElementById('cStat').textContent = '0';
+
+            // Clear the output box
+            displayOutput('Results will appear here...');
+
+            // Hide any alerts
+            hideAlert();
+        }
+
+        /**
+         * AUTO-UPDATE STATISTICS
+         *
+         * Add an event listener to update statistics as the user types
+         * This provides real-time feedback on sequence length and composition
+         */
+        document.getElementById('dnaInput').addEventListener('input', function() {
+            const { sequence, isValid } = cleanAndValidateSequence();
+
+            if (sequence.length > 0) {
+                updateStats(sequence);
+
+                if (!isValid) {
+                    showAlert('Invalid characters detected. Only A, T, G, C are allowed for DNA sequences.', 'warning');
+                } else {
+                    hideAlert();
+                }
+            } else {
+                // Reset stats if input is empty
+                updateStats('');
+                hideAlert();
+            }
+        });
+    </script>
+</body>
+</html>
