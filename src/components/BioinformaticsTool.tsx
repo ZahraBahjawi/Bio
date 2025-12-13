@@ -37,6 +37,7 @@ export default function BioinformaticsTool() {
   });
   const [output, setOutput] = useState('Results will appear here...');
   const [alert, setAlert] = useState<{ message: string; type: 'warning' | 'error' | 'success' } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Validate and clean DNA sequence
   const cleanAndValidate = (raw: string): ValidationResult => {
@@ -206,6 +207,95 @@ export default function BioinformaticsTool() {
     showAlert('Translation completed successfully!', 'success');
   };
 
+  const searchBLAST = async () => {
+    const { sequence, isValid, invalidChars } = cleanAndValidate(input);
+
+    if (sequence.length === 0) {
+      showAlert('Please enter a DNA sequence first.', 'error');
+      return;
+    }
+
+    if (!isValid) {
+      showAlert(`Warning: Invalid characters detected (${invalidChars}). They have been removed.`, 'warning');
+    }
+
+    if (sequence.length < 20) {
+      showAlert('Sequence too short. Minimum 20 nucleotides required for BLAST search.', 'error');
+      return;
+    }
+
+    setIsLoading(true);
+    setOutput('Searching NCBI BLAST database... This may take 30-60 seconds...');
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/blast-search`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ sequence }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        showAlert(data.error || 'BLAST search failed', 'error');
+        setOutput(`<p class="text-red-600"><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>`);
+        setIsLoading(false);
+        return;
+      }
+
+      if (response.status === 202) {
+        showAlert('BLAST search is still processing. Please try again in a moment.', 'warning');
+        setOutput(`<p class="text-yellow-600">Request ID: ${data.requestId}</p><p>Please wait and try again soon.</p>`);
+        setIsLoading(false);
+        return;
+      }
+
+      const hits = data.hits || [];
+
+      if (hits.length === 0) {
+        setOutput('<p class="text-gray-600">No matches found in BLAST database.</p>');
+        showAlert('No matches found', 'warning');
+      } else {
+        let resultHTML = '<div class="space-y-4">';
+        resultHTML += '<p><strong>BLAST Search Results - Top Matches</strong></p>';
+        resultHTML += '<p class="text-sm text-gray-600">Organisms matching your sequence:</p>';
+        resultHTML += '<div class="space-y-3">';
+
+        hits.forEach((hit, index) => {
+          resultHTML += `
+            <div class="border-l-4 border-green-500 pl-3 py-2">
+              <p class="font-semibold text-green-700">${index + 1}. ${hit.organism}</p>
+              <p class="text-xs text-gray-600 mt-1">Match: ${hit.description}</p>
+              <p class="text-xs text-gray-600">Identity: ${hit.identity}% | E-value: ${hit.evalue} | Score: ${hit.score}</p>
+            </div>
+          `;
+        });
+
+        resultHTML += '</div>';
+        resultHTML += '<p class="text-xs text-gray-500 italic mt-4">BLAST results are based on NCBI GenBank database comparisons.</p>';
+        resultHTML += '</div>';
+
+        setOutput(resultHTML);
+        showAlert(`Found ${hits.length} matching organisms!`, 'success');
+      }
+    } catch (error) {
+      console.error('BLAST error:', error);
+      showAlert('Connection error. Please try again.', 'error');
+      setOutput('<p class="text-red-600"><strong>Error:</strong> Failed to connect to BLAST service</p>');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const clearAll = () => {
     setInput('');
     setOutput('Results will appear here...');
@@ -273,6 +363,13 @@ export default function BioinformaticsTool() {
                 className="px-6 py-2 bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
               >
                 Translate to Protein
+              </button>
+              <button
+                onClick={searchBLAST}
+                disabled={isLoading}
+                className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Searching...' : 'Identify Organism (BLAST)'}
               </button>
               <button
                 onClick={clearAll}
