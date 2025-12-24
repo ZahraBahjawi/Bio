@@ -13,7 +13,8 @@ import {
   Calculator, 
   Scissors,
   TrendingUp,
-  Target // Added for gRNA
+  Target,
+  Microscope // Added for SMART
 } from 'lucide-react';
 
 interface ValidationResult {
@@ -138,6 +139,22 @@ export default function BioinformaticsTool() {
     if (type === 'success') setTimeout(() => setAlert(null), 5000);
   };
 
+  // --- HELPER: Translate DNA to Protein (Internal Use) ---
+  const getProteinSequence = (dna: string): string => {
+    const startIndex = dna.indexOf('ATG');
+    if (startIndex === -1) return '';
+    const codingSequence = dna.substring(startIndex);
+    let protein = '';
+    for (let i = 0; i < codingSequence.length; i += 3) {
+      const codon = codingSequence.substring(i, i + 3);
+      if (codon.length < 3) break;
+      const aminoAcid = geneticCode[codon];
+      if (aminoAcid === '*') break;
+      protein += aminoAcid;
+    }
+    return protein;
+  };
+
   // --- ANALYSIS FUNCTIONS ---
 
   const calculateGCContent = () => {
@@ -208,12 +225,7 @@ export default function BioinformaticsTool() {
       const codon = codingSequence.substring(i, i + 3);
       if (codon.length < 3) break;
       const aminoAcid = geneticCode[codon];
-      
-      if (aminoAcid === '*') { 
-        stopCodonFound = true; 
-        break; 
-      }
-      
+      if (aminoAcid === '*') { stopCodonFound = true; break; }
       protein += aminoAcid;
       
       const props = aminoAcidProperties[aminoAcid];
@@ -276,80 +288,44 @@ export default function BioinformaticsTool() {
     if (sequence.length === 0) { showAlert('Please enter a DNA sequence first.', 'error'); return; }
     if (!isValid) showAlert(`Warning: Invalid characters detected (${invalidChars}).`, 'warning');
 
-    const startIndex = sequence.indexOf('ATG');
-    if (startIndex === -1) { showAlert('No start codon (ATG) found for translation.', 'error'); return; }
-
-    const codingSequence = sequence.substring(startIndex);
-    let protein = '';
-    for (let i = 0; i < codingSequence.length; i += 3) {
-      const codon = codingSequence.substring(i, i + 3);
-      if (codon.length < 3) break;
-      const aminoAcid = geneticCode[codon];
-      if (aminoAcid === '*') break;
-      protein += aminoAcid;
-    }
-
-    if (protein.length < 9) {
-        showAlert('Protein sequence too short for hydropathy plot (need >9 AA).', 'error');
+    const protein = getProteinSequence(sequence);
+    if (!protein || protein.length < 9) {
+        showAlert('Sequence too short or no start codon found (need >9 AA).', 'error');
         return;
     }
 
-    // Sliding Window Calculation (Window Size: 9)
+    // Sliding Window (Size 9)
     const windowSize = 9;
     const scores = [];
     for (let i = 0; i <= protein.length - windowSize; i++) {
         let sum = 0;
-        for (let j = 0; j < windowSize; j++) {
-            sum += kyteDoolittleScale[protein[i+j]] || 0;
-        }
+        for (let j = 0; j < windowSize; j++) sum += kyteDoolittleScale[protein[i+j]] || 0;
         scores.push(sum / windowSize);
     }
 
-    // Generate SVG path
-    const height = 200;
-    const width = 600;
-    const maxScore = 4.5;
-    const minScore = -4.5;
+    const height = 200, width = 600;
+    const maxScore = 4.5, minScore = -4.5;
     const range = maxScore - minScore;
-
     const points = scores.map((score, i) => {
         const x = (i / (scores.length - 1)) * width;
         const y = height - ((score - minScore) / range) * height;
         return `${x},${y}`;
     }).join(' ');
-
     const zeroY = height - ((0 - minScore) / range) * height;
 
     setOutput(`
       <div class="space-y-6">
         <p class="text-xl font-bold text-brand-lime flex items-center gap-2"><TrendingUp size={24} /> Kyte-Doolittle Hydropathy Plot</p>
-
         <div class="bg-brand-black/40 p-4 rounded-xl border border-brand-slate/20 overflow-hidden relative">
            <svg viewBox="0 0 ${width} ${height}" class="w-full h-full" preserveAspectRatio="none">
               <line x1="0" y1="${zeroY}" x2="${width}" y2="${zeroY}" stroke="#628290" stroke-width="1" stroke-dasharray="4" opacity="0.5" />
               <polyline points="${points}" fill="none" stroke="#b1de00" stroke-width="2" vector-effect="non-scaling-stroke" />
               <polygon points="0,${zeroY} ${points} ${width},${zeroY}" fill="#b1de00" opacity="0.1" />
            </svg>
-
-           <div class="absolute top-2 left-2 text-xs text-brand-slate font-mono">Hydrophobic (+4.5)</div>
-           <div class="absolute bottom-2 left-2 text-xs text-brand-slate font-mono">Hydrophilic (-4.5)</div>
-           <div class="absolute bottom-2 right-2 text-xs text-brand-slate font-mono">Position</div>
+           <div class="absolute top-2 left-2 text-xs text-brand-slate font-mono">Hydrophobic</div>
+           <div class="absolute bottom-2 left-2 text-xs text-brand-slate font-mono">Hydrophilic</div>
         </div>
-
-        <div class="grid grid-cols-2 gap-4 text-sm">
-            <div class="bg-brand-slate/10 p-3 rounded-lg border border-brand-slate/20">
-                <span class="block text-brand-slate text-xs uppercase">Window Size</span>
-                <span class="text-white font-mono font-bold">9 AA</span>
-            </div>
-            <div class="bg-brand-slate/10 p-3 rounded-lg border border-brand-slate/20">
-                <span class="block text-brand-slate text-xs uppercase">Protein Length</span>
-                <span class="text-white font-mono font-bold">${protein.length} AA</span>
-            </div>
-        </div>
-
-        <p class="text-xs text-brand-slate italic mt-2">
-            Values above the center line indicate hydrophobic regions (potential transmembrane domains).
-        </p>
+        <p class="text-xs text-brand-slate italic mt-2">Peaks above center indicate hydrophobic regions (e.g., transmembrane domains).</p>
       </div>
     `);
     showAlert('Hydropathy plot generated!', 'success');
@@ -362,12 +338,10 @@ export default function BioinformaticsTool() {
 
     const motifRaw = prompt("Enter a DNA motif to find (e.g., GAATTC for EcoRI, or TATA):", "GAATTC");
     if (!motifRaw) return;
-
     const motif = motifRaw.toUpperCase().replace(/[^ATGC]/g, '');
-    if (motif.length === 0) { showAlert("Invalid motif. Only A, T, G, C allowed.", "error"); return; }
+    if (motif.length === 0) { showAlert("Invalid motif.", "error"); return; }
 
-    let count = 0;
-    let pos = sequence.indexOf(motif);
+    let count = 0, pos = sequence.indexOf(motif);
     const positions = [];
     while (pos !== -1) {
         count++;
@@ -381,24 +355,15 @@ export default function BioinformaticsTool() {
     setOutput(`
       <div class="space-y-6">
         <p class="text-xl font-bold text-brand-lime flex items-center gap-2"><Scissors size={24} /> Motif Finder</p>
-        
         <div class="bg-brand-slate/20 p-6 rounded-xl border border-brand-slate/30 flex items-center justify-between">
-          <div>
-            <span class="block text-brand-slate text-xs uppercase tracking-wider mb-1">Searching For</span>
-            <span class="font-mono text-2xl text-white font-bold tracking-widest">${motif}</span>
-          </div>
-          <div class="text-right">
-            <span class="block text-brand-slate text-xs uppercase tracking-wider mb-1">Matches Found</span>
-            <span class="font-mono text-3xl text-brand-lime font-bold">${count}</span>
-          </div>
+          <div><span class="block text-brand-slate text-xs uppercase mb-1">Motif</span><span class="font-mono text-2xl text-white font-bold tracking-widest">${motif}</span></div>
+          <div class="text-right"><span class="block text-brand-slate text-xs uppercase mb-1">Found</span><span class="font-mono text-3xl text-brand-lime font-bold">${count}</span></div>
         </div>
-
         <div class="bg-brand-black/20 p-5 rounded-xl border border-brand-slate/20">
-           <p class="text-xs font-bold text-brand-slate uppercase mb-3">Match Locations (bp)</p>
+           <p class="text-xs font-bold text-brand-slate uppercase mb-3">Locations (bp)</p>
            <div class="font-mono text-sm text-white/90 leading-relaxed bg-brand-dark p-3 rounded border border-white/5 break-all">
-             ${count > 0 ? formattedPos : '<span class="text-brand-slate italic">No matches found in the sequence.</span>'}
+             ${count > 0 ? formattedPos : '<span class="text-brand-slate italic">No matches found.</span>'}
            </div>
-           ${count > 0 ? `<p class="text-xs text-brand-slate mt-2 italic">Showing 1-based indices of the start position.</p>` : ''}
         </div>
       </div>
     `);
@@ -410,10 +375,8 @@ export default function BioinformaticsTool() {
     if (sequence.length === 0) { showAlert('Please enter a DNA sequence first.', 'error'); return; }
     if (!isValid) showAlert(`Warning: Invalid characters detected (${invalidChars}).`, 'warning');
 
-    const candidates: { pos: number; seq: string; pam: string }[] = [];
-    
-    // Scan for SpCas9 PAM (NGG) on forward strand
-    // Need 20bp upstream + 3bp PAM = 23bp total window
+    const candidates = [];
+    // Scan for NGG (SpCas9 PAM)
     for (let i = 20; i < sequence.length - 2; i++) {
         if (sequence[i + 1] === 'G' && sequence[i + 2] === 'G') {
             const target = sequence.substring(i - 20, i);
@@ -422,47 +385,45 @@ export default function BioinformaticsTool() {
         }
     }
 
-    if (candidates.length === 0) {
-        setOutput('<div class="text-brand-slate">No SpCas9 (NGG) PAM sites found with sufficient upstream sequence.</div>');
-        showAlert('No targets found.', 'warning');
-        return;
-    }
+    if (candidates.length === 0) { setOutput('<div class="text-brand-slate">No SpCas9 (NGG) targets found.</div>'); showAlert('No targets found.', 'warning'); return; }
 
     const listHtml = candidates.slice(0, 5).map(c => `
         <div class="flex justify-between items-center bg-white/5 p-3 rounded-lg border border-white/10 mb-2">
-            <div>
-                <span class="text-xs text-brand-slate block mb-1">Position ${c.pos}</span>
-                <span class="font-mono text-lg tracking-wide text-brand-lime">${c.seq}<span class="text-brand-green font-bold border-b-2 border-brand-green">${c.pam}</span></span>
-            </div>
+            <div><span class="text-xs text-brand-slate block mb-1">Pos ${c.pos}</span><span class="font-mono text-lg text-brand-lime">${c.seq}<span class="text-brand-green border-b-2 border-brand-green">${c.pam}</span></span></div>
             <div class="text-xs text-brand-slate bg-brand-black/20 px-2 py-1 rounded">Forward</div>
         </div>
     `).join('');
 
     setOutput(`
       <div class="space-y-6">
-        <p class="text-xl font-bold text-brand-lime flex items-center gap-2"><Target size={24} /> CRISPR/Cas9 gRNA Finder</p>
-        
-        <div class="bg-brand-slate/20 p-6 rounded-xl border border-brand-slate/30 flex items-center justify-between">
-          <div>
-            <span class="block text-brand-slate text-xs uppercase tracking-wider mb-1">PAM Type</span>
-            <span class="font-mono text-2xl text-white font-bold tracking-widest">NGG (SpCas9)</span>
-          </div>
-          <div class="text-right">
-            <span class="block text-brand-slate text-xs uppercase tracking-wider mb-1">Targets Found</span>
-            <span class="font-mono text-3xl text-brand-lime font-bold">${candidates.length}</span>
-          </div>
+        <p class="text-xl font-bold text-brand-lime flex items-center gap-2"><Target size={24} /> CRISPR gRNA Finder</p>
+        <div class="bg-brand-slate/20 p-6 rounded-xl border border-brand-slate/30 flex justify-between">
+          <div><span class="block text-brand-slate text-xs uppercase mb-1">PAM</span><span class="font-mono text-2xl text-white font-bold">NGG</span></div>
+          <div><span class="block text-brand-slate text-xs uppercase mb-1">Targets</span><span class="font-mono text-3xl text-brand-lime font-bold">${candidates.length}</span></div>
         </div>
-
         <div class="bg-brand-black/20 p-5 rounded-xl border border-brand-slate/20">
-           <p class="text-xs font-bold text-brand-slate uppercase mb-4 tracking-wider">Top Candidates (5 of ${candidates.length})</p>
-           <div class="space-y-2">
-             ${listHtml}
-           </div>
-           ${candidates.length > 5 ? `<p class="text-center text-xs text-brand-slate mt-4 italic">... and ${candidates.length - 5} more.</p>` : ''}
+           <p class="text-xs font-bold text-brand-slate uppercase mb-4">Top Candidates (5 of ${candidates.length})</p>
+           <div class="space-y-2">${listHtml}</div>
         </div>
       </div>
     `);
-    showAlert(`Found ${candidates.length} potential gRNA targets!`, 'success');
+    showAlert(`Found ${candidates.length} gRNA targets!`, 'success');
+  };
+
+  const openSmartAnalysis = () => {
+    const { sequence } = cleanAndValidate(input);
+    if (sequence.length === 0) { showAlert('Please enter a DNA sequence first.', 'error'); return; }
+    
+    const protein = getProteinSequence(sequence);
+    if (!protein || protein.length < 10) {
+      showAlert('Translated protein too short for SMART analysis.', 'error');
+      return;
+    }
+
+    // SMART URL for sequence analysis
+    const url = `http://smart.embl.de/smart/show_motifs.pl?SEQUENCE=${protein}`;
+    window.open(url, '_blank');
+    showAlert('Opening SMART Analysis in new tab...', 'success');
   };
 
   const fetchWikiImage = async (organismName: string) => {
@@ -478,9 +439,7 @@ export default function BioinformaticsTool() {
             const firstPageId = Object.keys(pages)[0];
             if (firstPageId !== '-1' && pages[firstPageId].thumbnail) return pages[firstPageId].thumbnail.source;
         }
-    } catch (e) {
-        // Silently fail for images
-    }
+    } catch (e) { }
     return null;
   };
 
@@ -491,11 +450,9 @@ export default function BioinformaticsTool() {
 
     setBlastStatus({ step: 'submitting', message: 'Initializing...' });
     
-    // Auto-fallback system
     for (const db of DATABASES) {
       for (const proxy of PROXIES) {
         setBlastStatus({ step: 'submitting', message: `Trying ${db.label}...` });
-        
         try {
           const result = await runBlastSearch(sequence, proxy, db.name);
           if (result) {
@@ -503,13 +460,13 @@ export default function BioinformaticsTool() {
              return; 
           }
         } catch (e) {
-          console.warn(`Failed with ${proxy} on ${db.name}. Trying next...`);
+          console.warn(`Failed with ${proxy} on ${db.name}`);
         }
       }
     }
 
     setBlastStatus({ step: 'error', message: 'All attempts failed.' });
-    setOutput(`<div class="space-y-3 bg-red-500/10 p-5 rounded-xl border border-red-500/20"><p class="font-bold text-red-400 flex items-center gap-2"><AlertCircle size={20}/> Service Unavailable</p><p class="text-sm text-red-200/80">All NCBI mirrors are currently busy or unreachable. Please try again in a few minutes.</p></div>`);
+    setOutput(`<div class="space-y-3 bg-red-500/10 p-5 rounded-xl border border-red-500/20"><p class="font-bold text-red-400 flex items-center gap-2"><AlertCircle size={20}/> Service Unavailable</p><p class="text-sm text-red-200/80">NCBI mirrors are currently busy. Please try again later.</p></div>`);
     showAlert('Failed to identify organism.', 'error');
   };
 
@@ -543,9 +500,7 @@ export default function BioinformaticsTool() {
         const checkRes = await fetch(`${proxy}${NCBI_URL}?${new URLSearchParams({ CMD: 'Get', RID: rid, FORMAT_OBJECT: 'SearchInfo' })}`);
         const checkText = await checkRes.text();
         if (checkText.includes('Status=READY')) status = 'READY';
-      } catch (e) {
-        // Ignore single polling error
-      }
+      } catch (e) { }
     }
 
     if (status !== 'READY') throw new Error('Timeout');
@@ -558,7 +513,6 @@ export default function BioinformaticsTool() {
   };
 
   const renderBlastResults = async (resultText: string, sourceLabel: string) => {
-      // 4. PARSE
       const chunks = resultText.split('>');
       const blastResults: BlastResult[] = [];
       const seenNames = new Set<string>();
@@ -584,7 +538,7 @@ export default function BioinformaticsTool() {
 
         if (name && !seenNames.has(name)) {
             seenNames.add(name);
-            blastResults.push({ id, name: name.trim(), description });
+            blastResults.push({ id, name: name.trim(), description, source: sourceLabel });
         }
       }
 
@@ -594,7 +548,6 @@ export default function BioinformaticsTool() {
           return;
       }
 
-      // 5. FETCH IMAGES
       setBlastStatus({ step: 'fetching_images', message: 'Fetching images...' });
       const resultsWithImages = await Promise.all(blastResults.map(async (result) => {
           const img = await fetchWikiImage(result.name);
@@ -603,7 +556,6 @@ export default function BioinformaticsTool() {
 
       setBlastStatus({ step: 'complete', message: 'Done' });
 
-      // 6. RENDER
       const hitsHtml = resultsWithImages.map((hit, i) => `
         <div class="flex flex-col sm:flex-row gap-5 p-5 mb-4 border rounded-xl ${i === 0 ? 'bg-brand-green/20 border-brand-lime/50 shadow-[0_0_25px_rgba(177,222,0,0.15)]' : 'bg-brand-black/20 border-white/5'} transition-all hover:bg-brand-slate/10">
            <div class="flex-shrink-0 w-full sm:w-28 h-28 bg-brand-dark rounded-lg overflow-hidden border border-white/10 flex items-center justify-center relative group">
@@ -738,12 +690,17 @@ export default function BioinformaticsTool() {
                 <Target size={28} className="group-hover:scale-110 group-hover:text-brand-lime transition-all duration-300" /> 
                 CRISPR gRNA
               </button>
+
+              <button onClick={openSmartAnalysis} className="px-6 py-6 bg-brand-slate/10 text-brand-slate border border-brand-slate/20 rounded-2xl font-bold hover:bg-brand-slate/20 hover:text-white hover:border-brand-slate/40 transition-all flex flex-col items-center justify-center gap-3 group">
+                <Microscope size={28} className="group-hover:scale-110 group-hover:text-brand-lime transition-all duration-300" /> 
+                SMART Analysis
+              </button>
               
-              <div className="col-span-2">
+              <div className="col-span-1 md:col-span-1">
                 <button 
                   onClick={identifyOrganism} 
                   disabled={blastStatus.step !== 'idle' && blastStatus.step !== 'complete' && blastStatus.step !== 'error'} 
-                  className={`w-full h-full px-6 py-6 rounded-2xl font-bold border transition-all flex flex-row items-center justify-center gap-3 group shadow-lg ${
+                  className={`w-full h-full px-6 py-6 rounded-2xl font-bold border transition-all flex flex-col items-center justify-center gap-3 group shadow-lg ${
                     blastStatus.step !== 'idle' && blastStatus.step !== 'complete' && blastStatus.step !== 'error' 
                     ? 'bg-brand-black/40 text-brand-slate border-white/5 cursor-wait' 
                     : 'bg-brand-lime text-brand-dark hover:bg-brand-green hover:text-white hover:border-brand-green hover:shadow-[0_0_25px_rgba(177,222,0,0.4)]'
