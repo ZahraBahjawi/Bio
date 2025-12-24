@@ -11,7 +11,8 @@ import {
   ExternalLink, 
   Trash2,
   Calculator, 
-  Scissors 
+  Scissors,
+  TrendingUp 
 } from 'lucide-react';
 
 interface ValidationResult {
@@ -25,7 +26,7 @@ interface BlastResult {
   name: string;
   description: string;
   image?: string;
-  source: string;
+  source: string; 
 }
 
 interface BlastStatus {
@@ -33,7 +34,25 @@ interface BlastStatus {
   message: string;
 }
 
-// Amino acid properties for analysis
+const geneticCode: Record<string, string> = {
+  'TTT': 'F', 'TTC': 'F', 'TTA': 'L', 'TTG': 'L',
+  'TCT': 'S', 'TCC': 'S', 'TCA': 'S', 'TCG': 'S',
+  'TAT': 'Y', 'TAC': 'Y', 'TAA': '*', 'TAG': '*',
+  'TGT': 'C', 'TGC': 'C', 'TGA': '*', 'TGG': 'W',
+  'CTT': 'L', 'CTC': 'L', 'CTA': 'L', 'CTG': 'L',
+  'CCT': 'P', 'CCC': 'P', 'CCA': 'P', 'CCG': 'P',
+  'CAT': 'H', 'CAC': 'H', 'CAA': 'Q', 'CAG': 'Q',
+  'CGT': 'R', 'CGC': 'R', 'CGA': 'R', 'CGG': 'R',
+  'ATT': 'I', 'ATC': 'I', 'ATA': 'I', 'ATG': 'M',
+  'ACT': 'T', 'ACC': 'T', 'ACA': 'T', 'ACG': 'T',
+  'AAT': 'N', 'AAC': 'N', 'AAA': 'K', 'AAG': 'K',
+  'AGT': 'S', 'AGC': 'S', 'AGA': 'R', 'AGG': 'R',
+  'GTT': 'V', 'GTC': 'V', 'GTA': 'V', 'GTG': 'V',
+  'GCT': 'A', 'GCC': 'A', 'GCA': 'A', 'GCG': 'A',
+  'GAT': 'D', 'GAC': 'D', 'GAA': 'E', 'GAG': 'E',
+  'GGT': 'G', 'GGC': 'G', 'GGA': 'G', 'GGG': 'G'
+};
+
 const aminoAcidProperties: Record<string, { name: string; type: string }> = {
   'F': { name: 'Phenylalanine', type: 'Hydrophobic' },
   'L': { name: 'Leucine', type: 'Hydrophobic' },
@@ -58,23 +77,12 @@ const aminoAcidProperties: Record<string, { name: string; type: string }> = {
   '*': { name: 'Stop', type: 'Stop' }
 };
 
-const geneticCode: Record<string, string> = {
-  'TTT': 'F', 'TTC': 'F', 'TTA': 'L', 'TTG': 'L',
-  'TCT': 'S', 'TCC': 'S', 'TCA': 'S', 'TCG': 'S',
-  'TAT': 'Y', 'TAC': 'Y', 'TAA': '*', 'TAG': '*',
-  'TGT': 'C', 'TGC': 'C', 'TGA': '*', 'TGG': 'W',
-  'CTT': 'L', 'CTC': 'L', 'CTA': 'L', 'CTG': 'L',
-  'CCT': 'P', 'CCC': 'P', 'CCA': 'P', 'CCG': 'P',
-  'CAT': 'H', 'CAC': 'H', 'CAA': 'Q', 'CAG': 'Q',
-  'CGT': 'R', 'CGC': 'R', 'CGA': 'R', 'CGG': 'R',
-  'ATT': 'I', 'ATC': 'I', 'ATA': 'I', 'ATG': 'M',
-  'ACT': 'T', 'ACC': 'T', 'ACA': 'T', 'ACG': 'T',
-  'AAT': 'N', 'AAC': 'N', 'AAA': 'K', 'AAG': 'K',
-  'AGT': 'S', 'AGC': 'S', 'AGA': 'R', 'AGG': 'R',
-  'GTT': 'V', 'GTC': 'V', 'GTA': 'V', 'GTG': 'V',
-  'GCT': 'A', 'GCC': 'A', 'GCA': 'A', 'GCG': 'A',
-  'GAT': 'D', 'GAC': 'D', 'GAA': 'E', 'GAG': 'E',
-  'GGT': 'G', 'GGC': 'G', 'GGA': 'G', 'GGG': 'G'
+// Kyte-Doolittle Scale for Hydropathy
+const kyteDoolittleScale: Record<string, number> = {
+  'A': 1.8, 'R': -4.5, 'N': -3.5, 'D': -3.5, 'C': 2.5,
+  'Q': -3.5, 'E': -3.5, 'G': -0.4, 'H': -3.2, 'I': 4.5,
+  'L': 3.8, 'K': -3.9, 'M': 1.9, 'F': 2.8, 'P': -1.6,
+  'S': -0.8, 'T': -0.7, 'W': -0.9, 'Y': -1.3, 'V': 4.2
 };
 
 const PROXIES = [
@@ -129,6 +137,8 @@ export default function BioinformaticsTool() {
     setAlert({ message, type });
     if (type === 'success') setTimeout(() => setAlert(null), 5000);
   };
+
+  // --- ANALYSIS FUNCTIONS ---
 
   const calculateGCContent = () => {
     const { sequence, isValid, invalidChars } = cleanAndValidate(input);
@@ -261,6 +271,90 @@ export default function BioinformaticsTool() {
     showAlert('Translation successful!', 'success');
   };
 
+  const generateHydropathyPlot = () => {
+    const { sequence, isValid, invalidChars } = cleanAndValidate(input);
+    if (sequence.length === 0) { showAlert('Please enter a DNA sequence first.', 'error'); return; }
+    if (!isValid) showAlert(`Warning: Invalid characters detected (${invalidChars}).`, 'warning');
+
+    const startIndex = sequence.indexOf('ATG');
+    if (startIndex === -1) { showAlert('No start codon (ATG) found for translation.', 'error'); return; }
+
+    const codingSequence = sequence.substring(startIndex);
+    let protein = '';
+    for (let i = 0; i < codingSequence.length; i += 3) {
+      const codon = codingSequence.substring(i, i + 3);
+      if (codon.length < 3) break;
+      const aminoAcid = geneticCode[codon];
+      if (aminoAcid === '*') break;
+      protein += aminoAcid;
+    }
+
+    if (protein.length < 9) {
+        showAlert('Protein sequence too short for hydropathy plot (need >9 AA).', 'error');
+        return;
+    }
+
+    // Sliding Window Calculation (Window Size: 9)
+    const windowSize = 9;
+    const scores = [];
+    for (let i = 0; i <= protein.length - windowSize; i++) {
+        let sum = 0;
+        for (let j = 0; j < windowSize; j++) {
+            sum += kyteDoolittleScale[protein[i+j]] || 0;
+        }
+        scores.push(sum / windowSize);
+    }
+
+    // Generate SVG path
+    const height = 200;
+    const width = 600;
+    const maxScore = 4.5;
+    const minScore = -4.5;
+    const range = maxScore - minScore;
+
+    const points = scores.map((score, i) => {
+        const x = (i / (scores.length - 1)) * width;
+        const y = height - ((score - minScore) / range) * height;
+        return `${x},${y}`;
+    }).join(' ');
+
+    const zeroY = height - ((0 - minScore) / range) * height;
+
+    setOutput(`
+      <div class="space-y-6">
+        <p class="text-xl font-bold text-brand-lime flex items-center gap-2"><TrendingUp size={24} /> Kyte-Doolittle Hydropathy Plot</p>
+
+        <div class="bg-brand-black/40 p-4 rounded-xl border border-brand-slate/20 overflow-hidden relative">
+           <svg viewBox="0 0 ${width} ${height}" class="w-full h-full" preserveAspectRatio="none">
+              <line x1="0" y1="${zeroY}" x2="${width}" y2="${zeroY}" stroke="#628290" stroke-width="1" stroke-dasharray="4" opacity="0.5" />
+              <polyline points="${points}" fill="none" stroke="#b1de00" stroke-width="2" vector-effect="non-scaling-stroke" />
+              <polygon points="0,${zeroY} ${points} ${width},${zeroY}" fill="#b1de00" opacity="0.1" />
+           </svg>
+
+           <div class="absolute top-2 left-2 text-xs text-brand-slate font-mono">Hydrophobic (+4.5)</div>
+           <div class="absolute bottom-2 left-2 text-xs text-brand-slate font-mono">Hydrophilic (-4.5)</div>
+           <div class="absolute bottom-2 right-2 text-xs text-brand-slate font-mono">Position</div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 text-sm">
+            <div class="bg-brand-slate/10 p-3 rounded-lg border border-brand-slate/20">
+                <span class="block text-brand-slate text-xs uppercase">Window Size</span>
+                <span class="text-white font-mono font-bold">9 AA</span>
+            </div>
+            <div class="bg-brand-slate/10 p-3 rounded-lg border border-brand-slate/20">
+                <span class="block text-brand-slate text-xs uppercase">Protein Length</span>
+                <span class="text-white font-mono font-bold">${protein.length} AA</span>
+            </div>
+        </div>
+
+        <p class="text-xs text-brand-slate italic mt-2">
+            Values above the center line indicate hydrophobic regions (potential transmembrane domains).
+        </p>
+      </div>
+    `);
+    showAlert('Hydropathy plot generated!', 'success');
+  };
+
   const findMotifs = () => {
     const { sequence, isValid, invalidChars } = cleanAndValidate(input);
     if (sequence.length === 0) { showAlert('Please enter a DNA sequence first.', 'error'); return; }
@@ -355,7 +449,7 @@ export default function BioinformaticsTool() {
     }
 
     setBlastStatus({ step: 'error', message: 'All attempts failed.' });
-    setOutput(`<div class="space-y-3 bg-red-500/10 p-5 rounded-xl border border-red-500/20"><p class="font-bold text-red-400 flex items-center gap-2"><AlertCircle size={20}/> Service Unavailable</p><p class="text-sm text-red-200/80">All NCBI mirrors are currently busy. Please try again in a few minutes.</p></div>`);
+    setOutput(`<div class="space-y-3 bg-red-500/10 p-5 rounded-xl border border-red-500/20"><p class="font-bold text-red-400 flex items-center gap-2"><AlertCircle size={20}/> Service Unavailable</p><p class="text-sm text-red-200/80">All NCBI mirrors are currently busy or unreachable. Please try again in a few minutes.</p></div>`);
     showAlert('Failed to identify organism.', 'error');
   };
 
@@ -570,16 +664,21 @@ export default function BioinformaticsTool() {
                 Translate
               </button>
 
+              <button onClick={generateHydropathyPlot} className="px-6 py-6 bg-brand-slate/10 text-brand-slate border border-brand-slate/20 rounded-2xl font-bold hover:bg-brand-slate/20 hover:text-white hover:border-brand-slate/40 transition-all flex flex-col items-center justify-center gap-3 group">
+                <TrendingUp size={28} className="group-hover:scale-110 group-hover:text-brand-lime transition-all duration-300" /> 
+                Hydropathy
+              </button>
+
               <button onClick={findMotifs} className="px-6 py-6 bg-brand-slate/10 text-brand-slate border border-brand-slate/20 rounded-2xl font-bold hover:bg-brand-slate/20 hover:text-white hover:border-brand-slate/40 transition-all flex flex-col items-center justify-center gap-3 group">
                 <Scissors size={28} className="group-hover:scale-110 group-hover:text-brand-lime transition-all duration-300" /> 
                 Motif Finder
               </button>
               
-              <div className="col-span-2 md:col-span-4 mt-2">
+              <div className="col-span-1 md:col-span-3">
                 <button 
                   onClick={identifyOrganism} 
                   disabled={blastStatus.step !== 'idle' && blastStatus.step !== 'complete' && blastStatus.step !== 'error'} 
-                  className={`w-full px-6 py-6 rounded-2xl font-bold border transition-all flex flex-row items-center justify-center gap-3 group shadow-lg ${
+                  className={`w-full h-full px-6 py-6 rounded-2xl font-bold border transition-all flex flex-row items-center justify-center gap-3 group shadow-lg ${
                     blastStatus.step !== 'idle' && blastStatus.step !== 'complete' && blastStatus.step !== 'error' 
                     ? 'bg-brand-black/40 text-brand-slate border-white/5 cursor-wait' 
                     : 'bg-brand-lime text-brand-dark hover:bg-brand-green hover:text-white hover:border-brand-green hover:shadow-[0_0_25px_rgba(177,222,0,0.4)]'
