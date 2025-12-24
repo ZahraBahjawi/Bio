@@ -12,7 +12,8 @@ import {
   Trash2,
   Calculator, 
   Scissors,
-  TrendingUp 
+  TrendingUp,
+  Target // Added for gRNA
 } from 'lucide-react';
 
 interface ValidationResult {
@@ -77,7 +78,6 @@ const aminoAcidProperties: Record<string, { name: string; type: string }> = {
   '*': { name: 'Stop', type: 'Stop' }
 };
 
-// Kyte-Doolittle Scale for Hydropathy
 const kyteDoolittleScale: Record<string, number> = {
   'A': 1.8, 'R': -4.5, 'N': -3.5, 'D': -3.5, 'C': 2.5,
   'Q': -3.5, 'E': -3.5, 'G': -0.4, 'H': -3.2, 'I': 4.5,
@@ -405,6 +405,66 @@ export default function BioinformaticsTool() {
     showAlert(`Found ${count} occurrences of ${motif}`, 'success');
   };
 
+  const findGRNA = () => {
+    const { sequence, isValid, invalidChars } = cleanAndValidate(input);
+    if (sequence.length === 0) { showAlert('Please enter a DNA sequence first.', 'error'); return; }
+    if (!isValid) showAlert(`Warning: Invalid characters detected (${invalidChars}).`, 'warning');
+
+    const candidates: { pos: number; seq: string; pam: string }[] = [];
+    
+    // Scan for SpCas9 PAM (NGG) on forward strand
+    // Need 20bp upstream + 3bp PAM = 23bp total window
+    for (let i = 20; i < sequence.length - 2; i++) {
+        if (sequence[i + 1] === 'G' && sequence[i + 2] === 'G') {
+            const target = sequence.substring(i - 20, i);
+            const pam = sequence.substring(i, i + 3);
+            candidates.push({ pos: i - 20 + 1, seq: target, pam });
+        }
+    }
+
+    if (candidates.length === 0) {
+        setOutput('<div class="text-brand-slate">No SpCas9 (NGG) PAM sites found with sufficient upstream sequence.</div>');
+        showAlert('No targets found.', 'warning');
+        return;
+    }
+
+    const listHtml = candidates.slice(0, 5).map(c => `
+        <div class="flex justify-between items-center bg-white/5 p-3 rounded-lg border border-white/10 mb-2">
+            <div>
+                <span class="text-xs text-brand-slate block mb-1">Position ${c.pos}</span>
+                <span class="font-mono text-lg tracking-wide text-brand-lime">${c.seq}<span class="text-brand-green font-bold border-b-2 border-brand-green">${c.pam}</span></span>
+            </div>
+            <div class="text-xs text-brand-slate bg-brand-black/20 px-2 py-1 rounded">Forward</div>
+        </div>
+    `).join('');
+
+    setOutput(`
+      <div class="space-y-6">
+        <p class="text-xl font-bold text-brand-lime flex items-center gap-2"><Target size={24} /> CRISPR/Cas9 gRNA Finder</p>
+        
+        <div class="bg-brand-slate/20 p-6 rounded-xl border border-brand-slate/30 flex items-center justify-between">
+          <div>
+            <span class="block text-brand-slate text-xs uppercase tracking-wider mb-1">PAM Type</span>
+            <span class="font-mono text-2xl text-white font-bold tracking-widest">NGG (SpCas9)</span>
+          </div>
+          <div class="text-right">
+            <span class="block text-brand-slate text-xs uppercase tracking-wider mb-1">Targets Found</span>
+            <span class="font-mono text-3xl text-brand-lime font-bold">${candidates.length}</span>
+          </div>
+        </div>
+
+        <div class="bg-brand-black/20 p-5 rounded-xl border border-brand-slate/20">
+           <p class="text-xs font-bold text-brand-slate uppercase mb-4 tracking-wider">Top Candidates (5 of ${candidates.length})</p>
+           <div class="space-y-2">
+             ${listHtml}
+           </div>
+           ${candidates.length > 5 ? `<p class="text-center text-xs text-brand-slate mt-4 italic">... and ${candidates.length - 5} more.</p>` : ''}
+        </div>
+      </div>
+    `);
+    showAlert(`Found ${candidates.length} potential gRNA targets!`, 'success');
+  };
+
   const fetchWikiImage = async (organismName: string) => {
     try {
         const controller = new AbortController();
@@ -673,8 +733,13 @@ export default function BioinformaticsTool() {
                 <Scissors size={28} className="group-hover:scale-110 group-hover:text-brand-lime transition-all duration-300" /> 
                 Motif Finder
               </button>
+
+              <button onClick={findGRNA} className="px-6 py-6 bg-brand-slate/10 text-brand-slate border border-brand-slate/20 rounded-2xl font-bold hover:bg-brand-slate/20 hover:text-white hover:border-brand-slate/40 transition-all flex flex-col items-center justify-center gap-3 group">
+                <Target size={28} className="group-hover:scale-110 group-hover:text-brand-lime transition-all duration-300" /> 
+                CRISPR gRNA
+              </button>
               
-              <div className="col-span-1 md:col-span-3">
+              <div className="col-span-2">
                 <button 
                   onClick={identifyOrganism} 
                   disabled={blastStatus.step !== 'idle' && blastStatus.step !== 'complete' && blastStatus.step !== 'error'} 
