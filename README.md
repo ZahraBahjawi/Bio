@@ -1,46 +1,35 @@
-1. Project Title
-BioOrigin: AI-Powered DNA Sequence Classifier
+# BioOrigin: AI-Powered DNA Sequence Classifier
+*Final project for the Building AI course*
 
-2. Summary
-This project upgrades a standard bioinformatics analysis tool with an AI component. While standard tools calculate fixed properties (like protein translation), BioOrigin uses machine learning to classify unknown DNA sequences by their likely organism of origin (e.g., distinguishing between viral, bacterial, and human DNA). This helps researchers quickly identify contaminants or unknown pathogens in raw sequencing data.
+## Summary
+BioOrigin is an upgrade to a standard bioinformatics dashboard. While the current tool calculates fixed properties (like GC content and protein translation), this project proposes adding an AI model to classify unknown DNA sequences by their likely organism of origin (e.g., distinguishing between viral, bacterial, and human DNA).
 
-3. Background
-The Problem: When researchers sequence DNA from environmental samples (like soil or gut microbiome), they get a "soup" of genetic material. Identifying which organism a specific DNA fragment belongs to is difficult without aligning it to massive databases, which is slow.
+## Background
+* **The Problem:** Metagenomic researchers often sequence "soups" of genetic material from soil or gut samples. Identifying which organism a specific DNA fragment belongs to is difficult without slow, massive database alignments.
+* **Motivation:** As a computational biology student, I want to build a lightweight tool that offers instant classification for students and researchers.
+* **Importance:** Rapid identification of pathogens or contaminants is critical in both clinical and environmental biology.
 
-Frequency: This is a daily challenge in metagenomics and pathogen detection.
+## How is it used?
+The solution is integrated into the existing web-based dashboard:
+1. **Input:** The user pastes a raw DNA sequence into the text area.
+2. **Analysis:** The AI analyzes the "k-mer" frequency (patterns of 3-4 nucleotides).
+3. **Output:** The system displays a probability score (e.g., "85% probability: E. coli").
 
-Motivation: As a computational biology student, I want to build a lightweight tool that offers instant, "approximate" classification without needing a supercomputer.
+## Data sources and AI methods
+* **Data:** The model will be trained on public genome data from **NCBI GenBank**, specifically reference genomes for model organisms like *H. sapiens*, *E. coli*, and *Lambda phage*.
+* **AI Techniques:**
+    * **Bag of Words (k-mers):** We will treat DNA substrings (k-mers) like words in a sentence to create frequency vectors.
+    * **K-Nearest Neighbors (KNN):** This algorithm will classify new sequences based on their similarity to known genomes in the k-mer vector space.
 
-4. How is it used?
-The solution is integrated into a web-based bioinformatics dashboard.
+## Challenges
+* **Sequence Length:** Short DNA fragments (<100bp) may not contain enough information for accurate classification.
+* **Mutation Rates:** Rapidly mutating viruses might evade detection if they differ significantly from the training data.
+* **Computation:** Running KNN on millions of fragments can be slow; optimization or pre-clustering will be required.
 
-Input: The user pastes a raw DNA sequence (e.g., from a FASTA file).
+## What next?
+* **Deep Learning:** Move from KNN to a Convolutional Neural Network (CNN) to detect complex motifs.
+* **Browser Integration:** Implement the model in TensorFlow.js to run entirely client-side, ensuring user data privacy.
 
-Process: The system cleans the input and calculates "k-mer frequencies" (counting how often 3-letter or 4-letter patterns appear).
-
-Prediction: The AI compares these frequencies to known profiles and outputs a probability score (e.g., "85% probability this is E. coli DNA").
-
-5. Data sources and AI methods
-Data: The model will be trained on public genome data from NCBI GenBank (National Center for Biotechnology Information). I will download reference genomes for common model organisms (Human H. sapiens, Bacteria E. coli, Virus Lambda phage).
-
-AI Techniques:
-
-Feature Extraction: I will use the "Bag of Words" technique (similar to text analysis), but instead of words, I will count k-mers (substrings of length k, like ATG, TGC).
-
-Classification: I will use K-Nearest Neighbors (KNN) to classify the new sequence based on which training genomes it most closely resembles in k-mer space.
-
-6. Challenges
-Sequence Length: Short DNA fragments (under 100bp) might not carry enough signal for accurate classification.
-
-Mutation Rates: Viruses mutate rapidly; the model might fail to recognize a highly mutated strain.
-
-New Organisms: The model can only classify organisms it has seen before; completely new species might be misclassified.
-
-7. What next?
-To grow this project, I would:
-
-Expand the training data to include thousands of species.
-
-Implement a Neural Network (CNN) which can often detect complex motifs better than simple k-mer counting.
-
-Host the model online using TensorFlow.js so it runs directly in the browser (client-side) to protect user data privacy.
+## Acknowledgments
+* Inspired by the *Elements of AI* course structure.
+* Biological data concepts from NCBI GenBank.
